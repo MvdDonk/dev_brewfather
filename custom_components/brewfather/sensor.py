@@ -16,6 +16,7 @@ from .coordinator import BrewfatherCoordinator, BrewfatherCoordinatorData
 from homeassistant.components.sensor import SensorEntity, SensorStateClass, SensorEntityDescription, SensorDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -36,8 +37,8 @@ async def async_setup_entry(
             coordinator,
             SensorKinds.fermenting_name,
             SensorEntityDescription(
-                key="batch_recipe_name",
-                name="Batch recipe name",
+                key="recipe_name",
+                name="Recipe name",
                 icon="mdi:glass-mug",
             )
         )
@@ -48,8 +49,8 @@ async def async_setup_entry(
             coordinator,
             SensorKinds.fermenting_current_temperature,
             SensorEntityDescription(
-                key="batch_target_temperature",
-                name="Batch target temperature",
+                key="target_temperature",
+                name="Target temperature",
                 icon="mdi:thermometer",
                 #native_unit_of_measurement=UnitOfTemperature.CELSIUS, #Should we support fahrenheit?
                 device_class=SensorDeviceClass.TEMPERATURE,
@@ -63,8 +64,8 @@ async def async_setup_entry(
             coordinator,
             SensorKinds.fermenting_next_temperature,
             SensorEntityDescription(
-                key="batch_upcoming_target_temperature",
-                name="Batch upcoming target temperature",
+                key="upcoming_target_temperature",
+                name="Upcoming target temperature",
                 icon="mdi:thermometer-chevron-up",
                 native_unit_of_measurement=UnitOfTemperature.CELSIUS, #Should we support fahrenheit?
                 device_class=SensorDeviceClass.TEMPERATURE,
@@ -77,8 +78,8 @@ async def async_setup_entry(
             coordinator,
             SensorKinds.fermenting_next_date,
             SensorEntityDescription(
-                key="batch_upcoming_target_temperature_change",
-                name="Batch upcoming target temperature change",
+                key="upcoming_target_temperature_change",
+                name="Upcoming target temperature change",
                 icon="mdi:clock",
                 device_class=SensorDeviceClass.TIMESTAMP,
             )
@@ -90,8 +91,8 @@ async def async_setup_entry(
             coordinator,
             SensorKinds.fermenting_last_reading,
             SensorEntityDescription(
-                key="batch_last_reading",
-                name="Batch last reading",
+                key="last_reading",
+                name="Last reading",
                 icon="mdi:chart-line",
                 state_class=SensorStateClass.MEASUREMENT,
             )
@@ -105,7 +106,7 @@ async def async_setup_entry(
                 coordinator,
                 SensorKinds.all_batch_info,
                 SensorEntityDescription(
-                    key="all_batches",
+                    key="all_batches_data",
                     name="All batches data",
                     icon="mdi:database",
                 )
@@ -138,10 +139,17 @@ class BrewfatherSensor(CoordinatorEntity[BrewfatherCoordinator], SensorEntity):
 
         self._entity_description = description
         self._sensor_type = sensorKind
-        self.device_type = self._entity_description.key
 
-        self._attr_name = f"{SENSOR_PREFIX} {self._entity_description.name}"
-        self._attr_unique_id = f"{SENSOR_PREFIX}_{self._entity_description.name}"
+
+        # # Set Friendly name when sensor is first created
+        self._attr_has_entity_name = True
+        self._attr_name = f"{SENSOR_PREFIX} - {self._entity_description.name}"
+        self._name = f"{SENSOR_PREFIX} - {self._entity_description.name}"
+
+        # The unique identifier for this sensor within Home Assistant
+        # has nothing to do with the entity_id, it is the internal unique_id of the sensor entity registry
+        self._attr_unique_id = f"{SENSOR_PREFIX}_{self._entity_description.key}"
+
 
         self._attr_icon = self._entity_description.icon
         self._attr_state_class = self._entity_description.state_class
@@ -156,21 +164,11 @@ class BrewfatherSensor(CoordinatorEntity[BrewfatherCoordinator], SensorEntity):
         self._state = sensor_data.state
         self._attr_available = sensor_data.attr_available
         self._attr_extra_state_attributes = sensor_data.extra_state_attributes
-        
+   
     @property
     def state(self) -> StateType:
         """Return the state."""
         return self._state
-
-    # @property
-    # def extra_state_attributes(self):
-    #     if self.batches is None:
-    #         return None
-    #     attributes = {}
-    #     attributes["data"] = []
-    #     for batch in self.batches:
-    #         attributes["data"].append(batch.to_attribute_entry_hassio())
-    #     return attributes
 
     @property
     def available(self) -> bool:
@@ -285,7 +283,7 @@ class BrewfatherSensor(CoordinatorEntity[BrewfatherCoordinator], SensorEntity):
             for other_batch in data.all_batches_data:
                 all_batches.append(other_batch.to_attribute_entry_hassio())
                 
-            custom_attributes["batches"] = all_batches
+            custom_attributes["data"] = all_batches
             sensor_data.state = len(all_batches)
 
         sensor_data.extra_state_attributes = custom_attributes
